@@ -1,0 +1,115 @@
+#include <iostream>
+#include <cmath>
+#include <ctime>
+#include <vector>
+
+using namespace std; 
+
+class Fineng{
+    public: 
+        vector<double> w;
+        vector<double> cdfVals;
+
+        double binomial_call(const double&, const double&, 
+                            const double&, const double&, const double&);
+        double binomial_call(const double&, const double&, const double&, 
+                            const double&, const double&, const int&);
+
+        double pdf(double z){
+            return 1/sqrt(2*M_PI) * exp(-0.5*z*z);
+            }
+        double cdf(const double&);
+        void getCDFValues();
+
+        // Fineng(vector<double> w, vector<double> cdfVals): w(100), cdfVals(6000) {}
+        // Fineng(string u, double w, double h, double dep, bool td, int dim) : 
+        //     unit(u), width(w), height(h), depth(dep), threedee(td), dims(dim) {}
+
+};
+
+#include <algorithm>
+double Fineng::binomial_call(const double& S,
+                            const double& X,
+                            const double& r,
+                            const double& u,
+                            const double& d){
+    double p_up = (exp(r)-d) / (u-d);
+    double p_down = 1.0-p_up;
+    double c_u = max(0.0, (u * S-X));
+    double c_d = max(0.0, (d * S-X));
+    double call_price = exp(-r) * (p_up * c_u + p_down * c_d);
+    return call_price;
+};
+
+double Fineng::binomial_call(const double& S,
+                            const double& K,
+                            const double& r,
+                            const double& u,
+                            const double& d,
+                            const int& no_periods){
+    double Rinv = exp(-r);
+    double uu = u * u;
+    double p_up = (exp(r)-d) / (u-d);
+    double p_down = 1.0-p_up;
+    vector<double> prices(no_periods + 1);
+    prices[0] = S * pow(d, no_periods);
+    for (int i = 1; i <= no_periods; ++i)
+        prices[i] = uu * prices[i-1];
+    vector<double> call_values(no_periods + 1);
+
+    for (int i = 0; i <= no_periods; ++i)
+        call_values[i] = max(0.0, (prices[i]-K));
+
+    for (int step=no_periods-1; step>=0; --step)
+        for (int i = 0; i <= step; ++i)
+            call_values[i] = (p_up * call_values[i + 1] + p_down * call_values[i]) * Rinv;
+    
+return call_values[0];
+};
+
+double Fineng::cdf(const double& x){
+    double k = 1.0 / (1.0 + 0.2316419 * x);
+    double k_sum = k * (0.319381530 + k * (-0.356563782 + k * (1.781477937 + k * (-1.821255978 + 1.330274429 * k))));
+
+    if (x >= 0.0)
+        return (1.0 - (1.0 / (pow(2 * M_PI, 0.5))) * exp(-0.5 * x * x) * k_sum);
+    else
+        return 1.0 - cdf(-x);
+}
+
+void Fineng::getCDFValues(){
+    cdfVals.push_back(pdf(-10) / 1000);
+    // values from -10 to +10 in 0.001 increments 
+    for (int i = 1; i < 20*1000; i++){
+        cdfVals.push_back(pdf(-10 + 0.001 * i) / 1000);
+        cdfVals[i] += cdfVals[i-1];
+        }
+    }
+
+
+int main(){
+    srand(time(NULL));
+    double a = rand() % 50;
+
+    cout << "\ne^" << a << " = " << exp(a) << endl;
+
+    Fineng f = Fineng();
+    f.getCDFValues();
+    double S = 100.0;
+    double K = 100.0;
+    double r = 0.025;
+    double u = 1.05;
+    double d = 1 / u;
+    cout << "One period European call price = "
+         << f.binomial_call(S, K, r, u, d) << endl;
+    int no_periods = 100;
+    cout << no_periods << " period European call price = "
+         << f.binomial_call(S, K, r, u, d, no_periods) << endl;
+
+    cout << "pdf(1) = " << f.pdf(1) << endl;
+    cout << "cdf(1) = " << f.cdf(1) << endl;
+    cout << "cdf(1) = " << f.cdfVals[11000] << endl;
+    // Look correct and similar 
+
+    return 0;
+}
